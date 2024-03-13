@@ -14,9 +14,9 @@ require (
 	github.com/cosmos/cosmos-sdk v0.47.5
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/gogoproto v1.4.10
-	github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7 v7.0.0
-	github.com/cosmos/ibc-apps/modules/ibc-hooks/v7 v7.0.0-20230803181732-7c8f814d3b79
-	github.com/cosmos/ibc-go/v7 v7.3.0
+	github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7 v7.1.3-0.20240228213828-cce7f56d000b
+	github.com/cosmos/ibc-apps/modules/ibc-hooks/v7 v7.0.0-20231017170841-8fd49ec0f017
+	github.com/cosmos/ibc-go/v7 v7.3.1
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/mux v1.8.0

@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	packetforwardtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/packetforward/types"
 	"io"
 	"net/http"
 	"os"
@@ -66,6 +67,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 
+	"github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/packetforward"
+	packetforwardkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/packetforward/keeper"
+
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
@@ -73,13 +77,12 @@ import (
 	govtypesv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	govtypesv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
-	"github.com/cosmos/cosmos-sdk/x/mint"
-	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
-	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
-
 	consensus "github.com/cosmos/cosmos-sdk/x/consensus"
 	consensusparamkeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
+	"github.com/cosmos/cosmos-sdk/x/mint"
+	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 
 	"github.com/cosmos/cosmos-sdk/x/params"
 	paramsclient "github.com/cosmos/cosmos-sdk/x/params/client"
@@ -97,10 +100,6 @@ import (
 	upgradeclient "github.com/cosmos/cosmos-sdk/x/upgrade/client"
 	upgradekeeper "github.com/cosmos/cosmos-sdk/x/upgrade/keeper"
 	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-
-	"github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/router"
-	routerkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/router/keeper"
-	routertypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/router/types"
 
 	ica "github.com/cosmos/ibc-go/v7/modules/apps/27-interchain-accounts"
 	icacontroller "github.com/cosmos/ibc-go/v7/modules/apps/27-interchain-accounts/controller"
@@ -254,7 +253,7 @@ var (
 		vesting.AppModuleBasic{},
 		ica.AppModuleBasic{},
 		ibcfee.AppModuleBasic{},
-		router.AppModuleBasic{},
+		packetforward.AppModuleBasic{},
 		authzmodule.AppModuleBasic{},
 		tokenfactory.AppModuleBasic{},
 		ibchooks.AppModuleBasic{},
@@ -334,7 +333,7 @@ type TerraApp struct {
 	ICAControllerKeeper   icacontrollerkeeper.Keeper
 	ICAHostKeeper         icahostkeeper.Keeper
 	IBCFeeKeeper          ibcfeekeeper.Keeper
-	RouterKeeper          routerkeeper.Keeper
+	PacketForwardKeeper   *packetforwardkeeper.Keeper
 	TokenFactoryKeeper    tokenfactorykeeper.Keeper
 	AllianceKeeper        alliancekeeper.Keeper
 
@@ -407,7 +406,7 @@ func NewTerraApp(
 		govtypes.StoreKey, paramstypes.StoreKey, ibcexported.StoreKey,
 		upgradetypes.StoreKey, evidencetypes.StoreKey, ibctransfertypes.StoreKey,
 		capabilitytypes.StoreKey, authzkeeper.StoreKey, feegrant.StoreKey,
-		icahosttypes.StoreKey, icacontrollertypes.StoreKey, routertypes.StoreKey,
+		icahosttypes.StoreKey, icacontrollertypes.StoreKey, packetforwardtypes.StoreKey,
 		consensusparamtypes.StoreKey, tokenfactorytypes.StoreKey, wasmtypes.StoreKey,
 		ibcfeetypes.StoreKey, ibchookstypes.StoreKey, crisistypes.StoreKey,
 		alliancetypes.StoreKey, pobtype.StoreKey,
@@ -597,18 +596,23 @@ func NewTerraApp(
 	// Hooks Middleware
 	hooksTransferStack := ibchooks.NewIBCMiddleware(&transferIBCModule, &app.HooksICS4Wrapper)
 
-	// Packet forwarding middleware
-	app.RouterKeeper = *routerkeeper.NewKeeper(
+	// RouterKeeper must be created before TransferKeeper
+	app.PacketForwardKeeper = packetforwardkeeper.NewKeeper(
 		appCodec,
-		app.keys[routertypes.StoreKey],
-		app.GetSubspace(routertypes.ModuleName),
+		app.keys[packetforwardtypes.StoreKey],
 		app.TransferKeeper,
 		app.IBCKeeper.ChannelKeeper,
 		app.DistrKeeper,
 		app.BankKeeper,
 		app.IBCKeeper.ChannelKeeper,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
-	pmfTransferStack := router.NewIBCMiddleware(hooksTransferStack, &app.RouterKeeper, 5, routerkeeper.DefaultForwardTransferPacketTimeoutTimestamp, routerkeeper.DefaultRefundTransferPacketTimeoutTimestamp)
+	pmfTransferStack := packetforward.NewIBCMiddleware(
+		hooksTransferStack,
+		app.PacketForwardKeeper,
+		5,
+		packetforwardkeeper.DefaultForwardTransferPacketTimeoutTimestamp,
+		packetforwardkeeper.DefaultRefundTransferPacketTimeoutTimestamp)
 
 	app.TransferStack = &pmfTransferStack
 
@@ -764,7 +768,7 @@ func NewTerraApp(
 		ibctransfer.NewAppModule(app.TransferKeeper),
 		ibcfee.NewAppModule(app.IBCFeeKeeper),
 		ica.NewAppModule(&app.ICAControllerKeeper, &app.ICAHostKeeper),
-		router.NewAppModule(&app.RouterKeeper),
+		packetforward.NewAppModule(app.PacketForwardKeeper, app.GetSubspace(packetforwardtypes.ModuleName)),
 		wasm.NewAppModule(appCodec, &app.WasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.MsgServiceRouter(), app.GetSubspace(wasmtypes.ModuleName)),
 		ibchooks.NewAppModule(app.AccountKeeper),
 		tokenfactory.NewAppModule(app.TokenFactoryKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(tokenfactorytypes.ModuleName)),
@@ -798,7 +802,7 @@ func NewTerraApp(
 		ibctransfertypes.ModuleName,
 		icatypes.ModuleName,
 		ibcfeetypes.ModuleName,
-		routertypes.ModuleName,
+		packetforwardtypes.ModuleName,
 		ibchookstypes.ModuleName,
 		wasmtypes.ModuleName,
 		tokenfactorytypes.ModuleName,
@@ -829,7 +833,7 @@ func NewTerraApp(
 		ibctransfertypes.ModuleName,
 		icatypes.ModuleName,
 		ibcfeetypes.ModuleName,
-		routertypes.ModuleName,
+		packetforwardtypes.ModuleName,
 		ibchookstypes.ModuleName,
 		wasmtypes.ModuleName,
 		tokenfactorytypes.ModuleName,
@@ -864,7 +868,7 @@ func NewTerraApp(
 		ibctransfertypes.ModuleName,
 		icatypes.ModuleName,
 		ibcfeetypes.ModuleName,
-		routertypes.ModuleName,
+		packetforwardtypes.ModuleName,
 		tokenfactorytypes.ModuleName,
 		ibchookstypes.ModuleName,
 		wasmtypes.ModuleName,
@@ -1201,7 +1205,7 @@ func initParamsKeeper(appCodec codec.BinaryCodec, legacyAmino *codec.LegacyAmino
 	paramsKeeper.Subspace(ibctransfertypes.ModuleName)
 	paramsKeeper.Subspace(ibcexported.ModuleName)
 	paramsKeeper.Subspace(icahosttypes.SubModuleName)
-	paramsKeeper.Subspace(routertypes.ModuleName).WithKeyTable(routertypes.ParamKeyTable())
+	paramsKeeper.Subspace(packetforwardtypes.ModuleName).WithKeyTable(packetforwardtypes.ParamKeyTable())
 	paramsKeeper.Subspace(tokenfactorytypes.ModuleName).WithKeyTable(tokenfactorytypes.ParamKeyTable())
 	paramsKeeper.Subspace(icacontrollertypes.SubModuleName)
 	paramsKeeper.Subspace(alliancetypes.ModuleName).WithKeyTable(alliancetypes.ParamKeyTable())
@@ -1306,7 +1310,7 @@ func (app *TerraApp) SimulationManager() *module.SimulationManager {
 		ibctransfer.NewAppModule(app.TransferKeeper),
 		ibcfee.NewAppModule(app.IBCFeeKeeper),
 		ica.NewAppModule(&app.ICAControllerKeeper, &app.ICAHostKeeper),
-		router.NewAppModule(&app.RouterKeeper),
+		packetforward.NewAppModule(app.PacketForwardKeeper, app.GetSubspace(packetforwardtypes.ModuleName)),
 		wasm.NewAppModule(appCodec, &app.WasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.MsgServiceRouter(), app.GetSubspace(wasmtypes.ModuleName)),
 		alliance.NewAppModule(appCodec, app.AllianceKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry, app.GetSubspace(alliancetypes.ModuleName)),
 	)

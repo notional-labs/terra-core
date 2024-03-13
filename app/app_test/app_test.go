@@ -43,7 +43,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/slashing"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/cosmos/cosmos-sdk/x/upgrade"
-	"github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/router"
+	"github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/packetforward"
 	ibchooks "github.com/cosmos/ibc-apps/modules/ibc-hooks/v7"
 	ica "github.com/cosmos/ibc-go/v7/modules/apps/27-interchain-accounts"
 	"github.com/cosmos/ibc-go/v7/modules/apps/transfer"
@@ -157,7 +157,7 @@ func TestInitGenesisOnMigration(t *testing.T) {
 			"ibchooks":               ibchooks.AppModule{}.ConsensusVersion(),
 			"interchainaccounts":     ica.AppModule{}.ConsensusVersion(),
 			"mint":                   mint.AppModule{}.ConsensusVersion(),
-			"packetfowardmiddleware": router.AppModule{}.ConsensusVersion(),
+			"packetfowardmiddleware": packetforward.AppModule{}.ConsensusVersion(),
 			"params":                 params.AppModule{}.ConsensusVersion(),
 			"slashing":               slashing.AppModule{}.ConsensusVersion(),
 			"staking":                staking.AppModule{}.ConsensusVersion(),
@@ -189,7 +189,7 @@ func TestInitGenesisOnMigration(t *testing.T) {
 		"interchainaccounts":     2,
 		"mint":                   2,
 		"mock":                   0,
-		"packetfowardmiddleware": 1,
+		"packetfowardmiddleware": 2,
 		"params":                 1,
 		"slashing":               3,
 		"staking":                4,
