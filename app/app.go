@@ -2,13 +2,14 @@ package app
 
 import (
 	"encoding/json"
-	packetforwardtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/packetforward/types"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"reflect" // #nosec G702
 	"strings"
+
+	packetforwardtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v7/packetforward/types"
 
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 
@@ -540,6 +541,7 @@ func NewTerraApp(
 	// ... other modules keepers
 	app.TokenFactoryKeeper = tokenfactorykeeper.NewKeeper(
 		keys[tokenfactorytypes.StoreKey],
+		maccPerms,
 		app.AccountKeeper,
 		app.BankKeeper,
 		app.DistrKeeper,

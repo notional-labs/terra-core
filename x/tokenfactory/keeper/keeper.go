@@ -19,6 +19,7 @@ type (
 	Keeper struct {
 		storeKey storetypes.StoreKey
 
+		permAddrs      map[string][]string
 		accountKeeper  types.AccountKeeper
 		bankKeeper     customtypes.Keeper
 		contractKeeper types.ContractKeeper
@@ -33,6 +34,7 @@ type (
 // NewKeeper returns a new instance of the x/tokenfactory keeper
 func NewKeeper(
 	storeKey storetypes.StoreKey,
+	permAddrs map[string][]string,
 	accountKeeper types.AccountKeeper,
 	bankKeeper customtypes.Keeper,
 	communityPoolKeeper types.CommunityPoolKeeper,
@@ -41,8 +43,8 @@ func NewKeeper(
 ) Keeper {
 
 	return Keeper{
-		storeKey: storeKey,
-
+		storeKey:            storeKey,
+		permAddrs:           permAddrs,
 		accountKeeper:       accountKeeper,
 		bankKeeper:          bankKeeper,
 		communityPoolKeeper: communityPoolKeeper,
